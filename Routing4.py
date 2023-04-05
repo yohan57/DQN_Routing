@@ -35,6 +35,7 @@ epsilon = 0.1
 
 class Enviroment(object):
     def __init__(self, shape):
+        self.free_cells = []
         self.generate_random_board(shape)
         # nrows, ncols = self._board.shape
         # self.free_cells = [(r,c) for r in range(nrows) for c in range(ncols) if self._board[r,c] == 1.0 and np.array([r,c]) != self.end]
@@ -186,14 +187,29 @@ class Enviroment(object):
             else:
                 continue
         self.end = end
-        self.free_cells = [(r,c) for r in range(self.nrows) for c in range(self.ncols) if self._board[r,c] == 1 and np.array([r,c]) not in [self.start, self.end]]
+        
+        for r in range(self.nrows):
+            for c in range(self.ncols):
+                if r == self.start[0] and c == self.start[1]:
+                    pass
+                elif r == self.end[0] and c == self.end[1]:
+                    pass
+                elif self._board[r,c] == 1:
+                    self.free_cells.append(np.array([r,c]))
         
     def set_routing_problem(self, board, start, end):
         self._board = board
         self.nrows, self.ncols = board.shape
         self.start = start
         self.end = end
-        self.free_cells = [(r,c) for r in range(self.nrows) for c in range(self.ncols) if self._board[r,c] == 1 and np.array([r,c]) not in [self.start, self.end]]
+        for r in range(self.nrows):
+            for c in range(self.ncols):
+                if r == self.start[0] and c == self.start[1]:
+                    pass
+                elif r == self.end[0] and c == self.end[1]:
+                    pass
+                elif self._board[r,c] == 1:
+                    self.free_cells.append(np.array([r,c]))
         self.reset(self.start)
     
 def show(qmaze):
@@ -305,7 +321,7 @@ def qtrain(model, shape, **opt):
 
     for epoch in range(n_epoch):
         loss = 0.0
-        routing_board.generate_random_board()
+        routing_board.generate_random_board(shape)
         state_cell = routing_board.start
         routing_board.reset(state_cell)
         # state_cell = random.choice(routing_board.free_cells)
@@ -391,11 +407,11 @@ def format_time(seconds):
         h = seconds / 3600.0
         return "%.2f hours" % (h,)
     
-def build_model(maze, lr=0.001):
+def build_model(size, lr=0.001):
     model = Sequential()
-    model.add(Dense(maze.size, input_shape=(maze.size,)))
+    model.add(Dense(size, input_shape=(size,)))
     model.add(PReLU())
-    model.add(Dense(maze.size))
+    model.add(Dense(size))
     model.add(PReLU())
     model.add(Dense(num_actions))
     model.compile(optimizer='adam', loss='mse')
@@ -429,8 +445,6 @@ def update_board(board, path):
         board[path[i]] = 0
 
 
-model = build_model(maze)
-qtrain(model, maze, n_epoch=100, max_memory=8*maze.size, data_size=32)
 
 routing1 =  np.array([
     [ 1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.],
@@ -443,9 +457,15 @@ routing1 =  np.array([
     [ 1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.],
 ])
 
+model = build_model(routing1.size)
+qtrain(model, routing1.shape , n_epoch=100, max_memory=8*routing1.size, data_size=32)
+
 routing1_path = solve_routing(model, routing1, (0, 0), (7, 7))
 
 routing2 = np.ones((10, 8))
+
+model = build_model(routing2.size)
+qtrain(model, routing2.shape , n_epoch=100, max_memory=8*routing2.size, data_size=32)
 
 start_dest_pair = [[[0, 4], [6, 3]], [[0, 6], [6, 5]], [[2, 2], [8, 1]], [[2, 5], [8, 4]]]
 path_list = []
