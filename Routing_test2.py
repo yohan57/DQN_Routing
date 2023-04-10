@@ -44,16 +44,16 @@ epsilon = 0.1
 
 # Grid Environment
 class Environment(object):
-    def __init__(self, shape, start, end, blocked_cells=None):
+    def __init__(self, shape, start, dest, obstacle_cells=None):
         self.height = shape[0]
         self.width = shape[1]
         self.grid = np.ones([self.height, self.width])
         self.free_cells = [(r,c) for r in range(self.grid.shape[0]) for c in range(self.grid.shape[1]) if self.grid[r,c] == 1.0]
         self.obstacle_cells = []
         
-        self.reset(start, end, blocked_cells)
+        self.reset(start, dest, obstacle_cells)
 
-    def reset(self, start, end, blocked_cells=None):
+    def reset(self, start, dest, obstacle_cells=None):
         self.grid = np.ones([self.height, self.width])
         
         self.start = start
@@ -62,15 +62,15 @@ class Environment(object):
             self.free_cells.remove(self.start)
         self.grid[self.agent[0], self.agent[1]] = agent_cell_mark
 
-        self.destination = end
+        self.destination = dest
         while np.array_equal(self.start, self.destination):
             self.destination = (np.random.randint(self.grid.shape[0]), np.random.randint(self.grid.shape[1]))
         self.grid[self.destination[0], self.destination[1]] = destination_cell_mark
         
         self.free_cells = [(r,c) for r in range(self.grid.shape[0]) for c in range(self.grid.shape[1]) if self.grid[r,c] == 1.0]
 
-        if blocked_cells != None:
-            for x, y in blocked_cells:
+        if obstacle_cells != None:
+            for x, y in obstacle_cells:
                 if (x,y) != self.start and (x,y) != self.destination:
                     self.grid[x, y] = obstacle_cell_mark
                 if (x,y) in self.free_cells:
@@ -85,7 +85,6 @@ class Environment(object):
         self.visited = set()
 
     def update_state(self, action):
-        nrows, ncols = self.grid.shape
         nrow, ncol, nmode = agent_row, agent_col, mode = self.agent_state
 
         if self.grid[agent_row, agent_col] > 0.0:
@@ -116,7 +115,6 @@ class Environment(object):
 
     def get_reward(self):
         agent_row, agent_col, mode = self.agent_state
-        nrows, ncols = self.grid.shape
         if agent_row == self.destination[0] and agent_col == self.destination[1]:
             return GOAL
         if mode == 'blocked':
@@ -213,8 +211,8 @@ def render(env):
     img = plt.imshow(canvas, cmap=cmap, norm=norm, interpolation='none')
     return img
 
-def play_game(model, env, start, end, blocked_cells):
-    env.reset(start, end, blocked_cells)
+def play_game(model, env, start, dest, obstacle_cells):
+    env.reset(start, dest, obstacle_cells)
     envstate = env.observe()
     count = 0
     action_list = []
@@ -293,7 +291,7 @@ def build_model(env, lr=0.001):
     model.compile(optimizer='adam', loss='mse')
     return model
 
-def qtrain(model, shape, start, end, blocked_cells, epochs, max_memory, data_size, weights_file = "", name = ""):
+def qtrain(model, shape, start, dest, obstacle_cells, epochs, max_memory, data_size, weights_file = "", name = ""):
     global epsilon
     
     n_epoch = epochs
@@ -310,7 +308,7 @@ def qtrain(model, shape, start, end, blocked_cells, epochs, max_memory, data_siz
         model.load_weights(weights_file)
 
     # Construct environment
-    env = Environment(shape, start, end, blocked_cells)
+    env = Environment(shape, start, dest, obstacle_cells)
 
     # Initialize experience replay object
     experience = Experience(model, max_memory=max_memory)
@@ -321,7 +319,7 @@ def qtrain(model, shape, start, end, blocked_cells, epochs, max_memory, data_siz
 
     for epoch in range(n_epoch):
         loss = 0.0
-        env.reset(start, end, blocked_cells)
+        env.reset(start, dest, obstacle_cells)
         game_over = False
 
         # get initial envstate (1d flattened canvas)
@@ -379,7 +377,7 @@ def qtrain(model, shape, start, end, blocked_cells, epochs, max_memory, data_siz
         # cases the agent won
         if win_rate > 0.9 : epsilon = 0.05
         if sum(win_history[-hsize:]) == hsize:
-            if completion_check(env) and play_game(model, env, start, end, blocked_cells):
+            if completion_check(env) and play_game(model, env, start, dest, obstacle_cells):
                 print("Reached 100%% win rate at epoch: %d" % (epoch,))
                 epsilon = 0.1
                 break
@@ -413,11 +411,11 @@ def format_time(seconds):
         h = seconds / 3600.0
         return "%.2f hours" % (h,)
 
-def demonstrate(model, episode_num, blocked_cells, shape, start, end):
+def demonstrate(model, episode_num, obstacle_cells, shape, start, dest):
     rendered_imgs = []
     count = 0
     
-    env = Environment(shape, start, end, blocked_cells)
+    env = Environment(shape, start, dest, obstacle_cells)
     envstate = env.observe()
     rendered_imgs.append(render(env))
     plt.savefig("demo/"+str(episode_num)+"-"+str(count)+".png")
@@ -429,7 +427,7 @@ def demonstrate(model, episode_num, blocked_cells, shape, start, end):
         action = np.argmax(q[0])
         action_list.append(action)
         envstate, reward, game_status = env.act(action)
-        blocked_cells.append(env.agent)
+        obstacle_cells.append(env.agent)
         rendered_imgs.append(render(env))
         plt.savefig("demo/"+str(episode_num)+"-"+str(count)+".png")
         count += 1
