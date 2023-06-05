@@ -172,7 +172,7 @@ class Environment(object):
             row, col, pcb, mode = self.agent_state
         else:
             row, col, pcb = cell
-        actions = [LEFT, UP, RIGHT, DOWN]
+        actions = [LEFT, UP, RIGHT, DOWN, VIA]
         nrows, ncols, _ = self.grid.shape
         if row == 0:
             actions.remove(UP)
@@ -210,17 +210,17 @@ class Environment(object):
                 self.free_cells.remove(cell)
             self.obstacle_cells.append(cell)
 
-def render(env):
+def render(env, pcb):
     plt.grid('on')
     nrows, ncols, _ = env.grid.shape
     ax = plt.gca()
-    ax.set_xticks(np.arange(0.5, nrows * 2, 1))
+    ax.set_xticks(np.arange(0.5, nrows, 1))
     ax.set_yticks(np.arange(0.5, ncols, 1))
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     
-    canvas = np.copy(env.grid)
-    canvas.reshape(nrows * 2, ncols)
+    canvas = np.copy(env.grid[:,:,pcb])
+    # canvas.reshape(nrows , ncols)
     
     cmap = plt.cm.colors.ListedColormap(['black', 'green', 'blue', 'skyblue', 'gray'])
     bounds = [0.0, 0.299, 0.5, 0.799, 0.801, 1.0]
@@ -430,13 +430,16 @@ def format_time(seconds):
         return "%.2f hours" % (h,)
 
 def demonstrate(model, episode_num, obstacle_cells, shape, start, dest):
-    rendered_imgs = []
+    rendered_imgs_top = []
+    rendered_imgs_bottom = []
     count = 0
     
     env = Environment(shape, start, dest, obstacle_cells)
     envstate = env.observe()
-    rendered_imgs.append(render(env))
-    plt.savefig("demo/"+str(episode_num)+"-"+str(count)+".png")
+    rendered_imgs_top.append(render(env,0))
+    plt.savefig("demo/"+str(episode_num)+"-"+str(count)+"-top.png")
+    rendered_imgs_bottom.append(render(env,1))
+    plt.savefig("demo/"+str(episode_num)+"-"+str(count)+"-bottom.png")
     count += 1
     action_list = []
     while True:
@@ -446,8 +449,10 @@ def demonstrate(model, episode_num, obstacle_cells, shape, start, dest):
         action_list.append(action)
         envstate, reward, game_status = env.act(action)
         obstacle_cells.append(env.agent)
-        rendered_imgs.append(render(env))
-        plt.savefig("demo/"+str(episode_num)+"-"+str(count)+".png")
+        rendered_imgs_top.append(render(env,0))
+        plt.savefig("demo/"+str(episode_num)+"-"+str(count)+"-top.png")
+        rendered_imgs_bottom.append(render(env,1))
+        plt.savefig("demo/"+str(episode_num)+"-"+str(count)+"-bottom.png")
         count += 1
         if game_status == 'win':
             print("win")
@@ -469,6 +474,6 @@ count = 0
 for start, dest in start_dest_pair:
     temp_env = Environment(routing2.shape, start, dest, obstacles)
     model = build_model(temp_env)
-    qtrain(model, routing2.shape, start, dest, obstacles, epochs=1000, max_memory=8*temp_env.grid.size, data_size=32, name="result_weight")
+    qtrain(model, routing2.shape, start, dest, obstacles, epochs=100000, max_memory=8*temp_env.grid.size, data_size=32, weights_file="result_weight.h5", name="result_weight")
     demonstrate(model, count, obstacles, routing2.shape, start, dest)
     count += 1
